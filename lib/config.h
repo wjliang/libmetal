@@ -43,6 +43,12 @@ extern "C" {
 #cmakedefine HAVE_STDATOMIC_H
 #cmakedefine HAVE_FUTEX_H
 
+/** Max number of allowed metal events */
+#define CONFIG_METAL_MAX_EVENTS		@CONFIG_METAL_MAX_EVENTS@UL
+
+/** Max number of allowed event tasks */
+#define CONFIG_METAL_MAX_EVENT_TASKS	@CONFIG_METAL_MAX_EVENT_TASKS@UL
+
 #ifdef __cplusplus
 }
 #endif

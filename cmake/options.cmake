@@ -57,6 +57,16 @@ endif (WITH_ZEPHYR)
 
 option (WITH_DEFAULT_LOGGER "Build with default logger" ON)
 
+if (NOT DEFINED CONFIG_METAL_MAX_EVENTS)
+  set (CONFIG_METAL_MAX_EVENTS 512)
+endif (NOT DEFINED CONFIG_METAL_MAX_EVENTS)
+message ("-- Max allowed metal events: ${CONFIG_METAL_MAX_EVENTS}")
+
+if (NOT DEFINED CONFIG_METAL_MAX_EVENT_TASKS)
+	set (CONFIG_METAL_MAX_EVENT_TASKS 512)
+endif (NOT DEFINED CONFIG_METAL_MAX_EVENT_TASKS)
+message ("-- Max allowed metal event tasks: ${CONFIG_METAL_MAX_EVENT_TASKS}")
+
 option (WITH_DOC "Build with documentation" ON)
 
 set (PROJECT_EC_FLAGS "-Wall -Werror -Wextra" CACHE STRING "")
