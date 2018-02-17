@@ -43,11 +43,12 @@ extern "C" {
 /** \defgroup irq Interrupt Handling Interfaces
  *  @{ */
 
+#include <metal/event.h>
 #include <stdlib.h>
 
 /** IRQ handled status */
-#define METAL_IRQ_NOT_HANDLED 0
-#define METAL_IRQ_HANDLED     1
+#define METAL_IRQ_NOT_HANDLED METAL_EVENT_NOT_HANDLED
+#define METAL_IRQ_HANDLED     METAL_EVENT_HANDLED
 
 /**
  * @brief	type of interrupt handler
@@ -101,33 +102,58 @@ int metal_irq_unregister(int irq,
 
 /**
  * @brief      disable interrupts
+ *
  * @return     interrupts state
  */
 unsigned int metal_irq_save_disable(void);
 
 /**
  * @brief      restore interrupts to their previous state
+ *
  * @param[in]  flags previous interrupts state
  */
 void metal_irq_restore_enable(unsigned int flags);
 
 /**
- * @brief	metal_irq_enable
+ * @brief      Enables the given interrupt
  *
- * Enables the given interrupt
- *
- * @param vector   - interrupt vector number
+ * @param[in]  vector interrupt vector number
  */
 void metal_irq_enable(unsigned int vector);
 
 /**
- * @brief	metal_irq_disable
+ * @brief     Disables the given interrupt
  *
- * Disables the given interrupt
- *
- * @param vector   - interrupt vector number
+ * @param[in] vector interrupt vector number
  */
 void metal_irq_disable(unsigned int vector);
+
+/**
+ * @brief       metal initialize IRQ controller
+ *
+ * @param[in]   irq_enable user defined IRQ enabling
+ * @param[in]   irq_disable user defined IRQ disabling
+ * @param[in]   irq_register user defined IRQ event handler registration/
+ *                           this API is supposed to add the metal
+ *                           event handle to the event handles list of
+ *                           the irq metal event.
+ * @return      0 for success, negative value for failure
+ */
+int
+metal_irq_control_init(int (*irq_enable)(int vector),
+		       int (*irq_disable)(int vector),
+		       int (*irq_register)(int vector,
+					   struct metal_event_hd *hd));
+
+/**
+ * @brief       metal generic irq handler
+ *
+ * It will call the registered IRQ handlers from the irq_event.
+ *
+ * @param[in]   irq_event pointer to IRQ event
+ * @return      0 irq is not handled, 1 irq is handled.
+ */
+int metal_irq_generic_isr(struct metal_event *irq_event);
 
 #include <metal/system/@PROJECT_SYSTEM@/irq.h>
 
