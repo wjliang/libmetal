@@ -177,9 +177,10 @@ metal_io_virt_to_offset(struct metal_io_region *io, void *virt)
 static inline metal_phys_addr_t
 metal_io_phys(struct metal_io_region *io, unsigned long offset)
 {
-	unsigned long page = offset >> io->page_shift;
+	unsigned long page = (io->page_shift >=
+			     sizeof(metal_phys_addr_t) * CHAR_BIT ?
+			     0 : offset >> io->page_shift);
 	return (io->physmap != NULL && offset <= io->size
-		&& io->physmap[page] != METAL_BAD_PHYS
 		? io->physmap[page] + (offset & io->page_mask)
 		: METAL_BAD_PHYS);
 }
