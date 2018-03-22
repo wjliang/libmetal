@@ -50,7 +50,15 @@ extern "C" {
  *  @{ */
 
 /** Physical address type. */
+#ifdef ADDR_64BIT
+#warning "64bit address"
+typedef uint64_t metal_phys_addr_t;
+#elif ADDR_32BIT
+#warning "32bit address"
+typedef uint32_t metal_phys_addr_t;
+#else
 typedef unsigned long metal_phys_addr_t;
+#endif
 
 /** Interrupt request number. */
 typedef int metal_irq_t;
