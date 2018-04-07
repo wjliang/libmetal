@@ -90,6 +90,7 @@ struct metal_io_ops {
 
 /** Libmetal I/O region structure. */
 struct metal_io_region {
+	char name[32];                      /**< name of the I/O region */
 	void			*virt;      /**< base virtual address */
 	const metal_phys_addr_t	*physmap;   /**< table of base physical address
                                                  of each of the pages in the I/O
