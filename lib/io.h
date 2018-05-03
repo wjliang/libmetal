@@ -78,6 +78,9 @@ struct metal_io_region {
 	struct metal_io_ops	ops;        /**< I/O region operations */
 };
 
+extern struct metal_io_ops metal_io_device_block_mem_ops;
+extern struct metal_io_ops metal_io_normal_mem_ops;
+
 /**
  * @brief	Open a libmetal I/O region.
  *
@@ -348,6 +351,36 @@ int metal_io_block_write(struct metal_io_region *io, unsigned long offset,
 int metal_io_block_set(struct metal_io_region *io, unsigned long offset,
 	       unsigned char value, int len);
 
+int metal_io_normal_mem_block_read(struct metal_io_region *io,
+					 unsigned long offset,
+					 void *restrict dst,
+					 memory_order order,
+					 int len);
+int metal_io_normal_mem_block_write(struct metal_io_region *io,
+					   unsigned long offset,
+					   const void *restrict src,
+					   memory_order order,
+					   int len);
+void metal_io_normal_mem_block_set(struct metal_io_region *io,
+					  unsigned long offset,
+					  unsigned char value,
+					  memory_order order,
+					  int len);
+int metal_io_device_mem_block_read(struct metal_io_region *io,
+					 unsigned long offset,
+					 void *restrict dst,
+					 memory_order order,
+					 int len);
+int metal_io_device_mem_block_write(struct metal_io_region *io,
+					   unsigned long offset,
+					   const void *restrict src,
+					   memory_order order,
+					   int len);
+void metal_io_device_mem_block_set(struct metal_io_region *io,
+					  unsigned long offset,
+					  unsigned char value,
+					  memory_order order,
+					  int len);
 #include <metal/system/@PROJECT_SYSTEM@/io.h>
 
 /** @} */

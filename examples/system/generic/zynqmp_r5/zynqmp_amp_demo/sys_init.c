@@ -99,7 +99,17 @@ static struct metal_device metal_dev_table[] = {
 				.page_mask = DEFAULT_PAGE_MASK,
 				.mem_flags = NORM_SHARED_NCACHE |
 						PRIV_RW_USER_RW,
-				.ops = {NULL},
+				.ops = {
+					.read = NULL,
+					.write = NULL,
+					.block_read =
+					metal_io_normal_mem_block_read,
+					.block_write =
+					metal_io_normal_mem_block_write,
+					.block_set =
+					metal_io_normal_mem_block_set,
+					.close = NULL,
+				},
 			}
 		},
 		.node = {NULL},

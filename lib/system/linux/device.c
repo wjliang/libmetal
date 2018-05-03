@@ -234,7 +234,8 @@ static int metal_uio_dev_open(struct linux_bus *lbus, struct linux_device *ldev)
 			 metal_map(ldev->fd, offset, size, 0, 0, &virt));
 		if (!result) {
 			io = &ldev->device.regions[ldev->device.num_regions];
-			metal_io_init(io, virt, phys, size, -1, 0, NULL);
+			metal_io_init(io, virt, phys, size, -1, 0,
+				      &metal_io_device_block_mem_ops);
 			ldev->device.num_regions++;
 		}
 	}

@@ -9,6 +9,130 @@
 #include <metal/io.h>
 #include <metal/sys.h>
 
+int metal_io_normal_mem_block_read(struct metal_io_region *io,
+					 unsigned long offset,
+					 void *restrict dst,
+					 memory_order order,
+					 int len)
+{
+	(void)order;
+	memcpy(dst, metal_io_virt(io, offset), len);
+	return len;
+}
+
+int metal_io_normal_mem_block_write(struct metal_io_region *io,
+					   unsigned long offset,
+					   const void *restrict src,
+					   memory_order order,
+					   int len)
+{
+	(void)order;
+	memcpy(metal_io_virt(io, offset), src, len);
+	return len;
+}
+
+void metal_io_normal_mem_block_set(struct metal_io_region *io,
+					  unsigned long offset,
+					  unsigned char value,
+					  memory_order order,
+					  int len)
+{
+	(void)order;
+	memset(metal_io_virt(io, offset), value, len);
+}
+
+struct metal_io_ops metal_weak metal_io_normal_mem_ops = {
+	.read = NULL,
+	.write = NULL,
+	.block_read = metal_io_normal_mem_block_read,
+	.block_write = metal_io_normal_mem_block_write,
+	.block_set = metal_io_normal_mem_block_set,
+	.close = NULL,
+};
+
+int metal_io_device_mem_block_read(struct metal_io_region *io,
+					 unsigned long offset,
+					 void *restrict dst,
+					 memory_order order,
+					 int len)
+{
+	void *ptr = metal_io_virt(io, offset);
+	int retlen;
+
+	retlen = len;
+	atomic_thread_fence(order);
+	while (len && (((uintptr_t)dst % sizeof(int)) ||
+		       ((uintptr_t)ptr % sizeof(int)))) {
+		*(unsigned char *)dst = *(const unsigned char *)ptr;
+		dst++;
+		ptr++;
+		len--;
+	}
+	for (; len >= (int)sizeof(int); dst += sizeof(int),
+	     ptr += sizeof(int), len -= sizeof(int))
+		*(unsigned int *)dst = *(const unsigned int *)ptr;
+	for (; len != 0; dst++, ptr++, len--)
+		*(unsigned char *)dst = *(const unsigned char *)ptr;
+	return retlen;
+}
+
+int metal_io_device_mem_block_write(struct metal_io_region *io,
+					   unsigned long offset,
+					   const void *restrict src,
+					   memory_order order,
+					   int len)
+{
+	void *ptr = metal_io_virt(io, offset);
+	int retlen;
+
+	retlen = len;
+	while (len && (((uintptr_t)ptr % sizeof(int)) ||
+		       ((uintptr_t)src % sizeof(int)))) {
+		*(unsigned char *)ptr = *(const unsigned char *)src;
+		ptr++;
+		src++;
+		len--;
+	}
+	for (; len >= (int)sizeof(int); ptr += sizeof(int),
+	     src += sizeof(int), len -= sizeof(int))
+		*(unsigned int *)ptr = *(const unsigned int *)src;
+	for (; len != 0; ptr++, src++, len--)
+		*(unsigned char *)ptr = *(const unsigned char *)src;
+	atomic_thread_fence(order);
+	return retlen;
+}
+
+void metal_io_device_mem_block_set(struct metal_io_region *io,
+					  unsigned long offset,
+					  unsigned char value,
+					  memory_order order,
+					  int len)
+{
+	void *ptr = metal_io_virt(io, offset);
+	unsigned int cint = value;
+	unsigned int i;
+
+	for (i = 1; i < sizeof(int); i++)
+		cint |= ((unsigned int)value << (8 * i));
+
+	for (; len && ((uintptr_t)ptr % sizeof(int)); ptr++, len--)
+		*(unsigned char *)ptr = (unsigned char) value;
+	for (; len >= (int)sizeof(int); ptr += sizeof(int),
+	     len -= sizeof(int))
+		*(unsigned int *)ptr = cint;
+	for (; len != 0; ptr++, len--)
+		*(unsigned char *)ptr = (unsigned char) value;
+	atomic_thread_fence(order);
+}
+
+struct metal_io_ops metal_weak metal_io_device_block_mem_ops = {
+	.read = NULL,
+	.write = NULL,
+	.block_read = metal_io_device_mem_block_read,
+	.block_write = metal_io_device_mem_block_write,
+	.block_set = metal_io_device_mem_block_set,
+	.close = NULL,
+};
 void metal_io_init(struct metal_io_region *io, void *virt,
 	      const metal_phys_addr_t *physmap, size_t size,
 	      unsigned page_shift, unsigned int mem_flags,
@@ -33,105 +157,47 @@ void metal_io_init(struct metal_io_region *io, void *virt,
 int metal_io_block_read(struct metal_io_region *io, unsigned long offset,
 	       void *restrict dst, int len)
 {
-	void *ptr = metal_io_virt(io, offset);
-	int retlen;
-
 	if (offset > io->size)
 		return -ERANGE;
 	if ((offset + len) > io->size)
 		len = io->size - offset;
-	retlen = len;
-	if (io->ops.block_read) {
-		retlen = (*io->ops.block_read)(
-			io, offset, dst, memory_order_seq_cst, len);
-	} else {
-		atomic_thread_fence(memory_order_seq_cst);
-		while ( len && (
-			((uintptr_t)dst % sizeof(int)) ||
-			((uintptr_t)ptr % sizeof(int)))) {
-			*(unsigned char *)dst =
-				*(const unsigned char *)ptr;
-			dst++;
-			ptr++;
-			len--;
-		}
-		for (; len >= (int)sizeof(int); dst += sizeof(int),
-					ptr += sizeof(int),
-					len -= sizeof(int))
-			*(unsigned int *)dst = *(const unsigned int *)ptr;
-		for (; len != 0; dst++, ptr++, len--)
-			*(unsigned char *)dst =
-				*(const unsigned char *)ptr;
-	}
-	return retlen;
+	if (io->ops.block_read)
+		return io->ops.block_read(io, offset, dst,
+					  memory_order_seq_cst, len);
+	else
+		/* block read is not supported on this I/O region */
+		return -ERANGE;
 }
 
 int metal_io_block_write(struct metal_io_region *io, unsigned long offset,
 	       const void *restrict src, int len)
 {
-	void *ptr = metal_io_virt(io, offset);
-	int retlen;
-
 	if (offset > io->size)
 		return -ERANGE;
 	if ((offset + len) > io->size)
 		len = io->size - offset;
-	retlen = len;
-	if (io->ops.block_write) {
-		retlen = (*io->ops.block_write)(
-			io, offset, src, memory_order_seq_cst, len);
-	} else {
-		while ( len && (
-			((uintptr_t)ptr % sizeof(int)) ||
-			((uintptr_t)src % sizeof(int)))) {
-			*(unsigned char *)ptr =
-				*(const unsigned char *)src;
-			ptr++;
-			src++;
-			len--;
-		}
-		for (; len >= (int)sizeof(int); ptr += sizeof(int),
-					src += sizeof(int),
-					len -= sizeof(int))
-			*(unsigned int *)ptr = *(const unsigned int *)src;
-		for (; len != 0; ptr++, src++, len--)
-			*(unsigned char *)ptr =
-				*(const unsigned char *)src;
-		atomic_thread_fence(memory_order_seq_cst);
-	}
-	return retlen;
+	if (io->ops.block_write)
+		return io->ops.block_write(io, offset, src,
+					   memory_order_seq_cst, len);
+	else
+		/* block write is not supported on this I/O region */
+		return -ERANGE;
 }
 
 int metal_io_block_set(struct metal_io_region *io, unsigned long offset,
 	       unsigned char value, int len)
 {
-	void *ptr = metal_io_virt(io, offset);
-	int retlen = len;
-
 	if (offset > io->size)
 		return -ERANGE;
 	if ((offset + len) > io->size)
 		len = io->size - offset;
-	retlen = len;
 	if (io->ops.block_set) {
-		(*io->ops.block_set)(
-			io, offset, value, memory_order_seq_cst, len);
+		io->ops.block_set(io, offset, value,
+				  memory_order_seq_cst, len);
+		return len;
 	} else {
-		unsigned int cint = value;
-		unsigned int i;
-
-		for (i = 1; i < sizeof(int); i++)
-			cint |= ((unsigned int)value << (8 * i));
-
-		for (; len && ((uintptr_t)ptr % sizeof(int)); ptr++, len--)
-			*(unsigned char *)ptr = (unsigned char) value;
-		for (; len >= (int)sizeof(int); ptr += sizeof(int),
-						len -= sizeof(int))
-			*(unsigned int *)ptr = cint;
-		for (; len != 0; ptr++, len--)
-			*(unsigned char *)ptr = (unsigned char) value;
-		atomic_thread_fence(memory_order_seq_cst);
+		/* block set is not supported on this I/O region */
+		return -ERANGE;
 	}
-	return retlen;
 }
 
